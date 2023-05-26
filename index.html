@@ -21,14 +21,19 @@
         .CodeMirror-merge-gap {
             display: none;
         }
+
+        #typein {
+            width: 100%;
+        }
     </style>
 </head>
 
 <body>
     <!-- <input type="text" id="typein"> -->
-    <textarea id="typein" cols="100" rows="15"></textarea>
+    <textarea id="typein" rows="30"></textarea>
     <div id="code_view"></div>
-    <button id="switch">切换</button>
+    <!-- <button id="switch">切换</button> -->
+    <button id="copy">拷贝</button>
     <button id="export">日报</button>
     <button id="enter">录入</button>
 
@@ -39,7 +44,8 @@
     <script>
 
         const inputBox = document.querySelector("#typein");
-        const buttonSwitch = document.querySelector("#switch");
+        // const buttonSwitch = document.querySelector("#switch");
+        const buttonCopy = document.querySelector("#copy");
         const buttonExport = document.querySelector("#export");
         const buttonEnter = document.querySelector("#enter");
         let reg_flag = ["登高二|登高站扩建|储气|龙马|南浦", "外环西段|温泉", "莲塘|军田|田岗|文塔|汇能"];
@@ -134,7 +140,24 @@
                 processed_projs.push(processed_text);
             };
 
-            inputBox.value = processed_projs.join("\n");
+            // 修改前后文本对比
+            let leftValue = inputValue;
+            let rightValue = processed_projs.join("\n");
+            let t = document.getElementById("code_view");
+            CodeMirror.MergeView(t, {
+                value: leftValue,
+                lineWrapping: true,
+                origLeft: null,
+                orig: rightValue,
+                lineNumbers: true,
+                mode: "text/plain",
+                highlightDifferences: true,
+                connect: null,
+                collapseIdentical: false,
+                allowEditingOriginals: true
+            })
+            // inputBox.value = processed_projs.join("\n");
+            inputBox.style.display = "none";
             navigator.clipboard.writeText(processed_projs.join("\n"));
 
             // 将结果存入sessionStorage
@@ -164,71 +187,98 @@
 
         }
 
-        //切换显示内容：修改前<--->修改后
-        buttonSwitch.onclick = function () {
-            const leftBox = document.querySelector(".CodeMirror-merge-pane");
-            const rightBox = document.querySelector(".CodeMirror-merge-right");
+        // 切换显示内容：修改前<--->修改后
+        // buttonSwitch.onclick = function () {
+        //     const leftBox = document.querySelector(".CodeMirror-merge-pane");
+        //     const rightBox = document.querySelector(".CodeMirror-merge-right");
 
-            if (rightBox.style.display == "none") {
-                leftBox.style.display = "none";
-                rightBox.style.display = "inline-block";
-            } else {
-                leftBox.style.display = "inline-block";
-                rightBox.style.display = "none";
+        //     if (rightBox.style.display == "none") {
+        //         leftBox.style.display = "none";
+        //         rightBox.style.display = "inline-block";
+        //     } else {
+        //         leftBox.style.display = "inline-block";
+        //         rightBox.style.display = "none";
+        //     }
+        // }
+
+        // 拷贝内容
+        function copyRightTxt() {
+            if (document.querySelector(".CodeMirror-merge")) {
+                const right_text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
+                let copy_text = "";
+                if (right_text_containers.length == 1) {
+                    copy_text = right_text_containers[0].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+                } else {
+                    for (let i = 0; i < right_text_containers.length; i++) {
+                        copy_text = copy_text + right_text_containers[i].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+                        if (i < right_text_containers.length - 1)
+                            copy_text = copy_text + "\n";
+                    }
+                }
+                // alert(copy_text);
+                navigator.clipboard.writeText(copy_text);
             }
         }
+        buttonCopy.onclick = copyRightTxt;
 
         // 生成日报并用CodeMirror显示修改前后对比结果
         buttonExport.onclick = function () {
 
-            // 对日报内容进行排序
-            if (sessionStorage.getItem("processedProjs")) {
-                let processed_projs = sessionStorage.getItem("processedProjs").split("\n");
-                let input_projs_session = sessionStorage.getItem("inputProjs").split("\n");
-                let today_projs = [], input_projs = [];
-                let projIndex = 1;
-                for (let i = 0; i < reg_flag.join("|").split("|").length; i++) {
-                    for (let j = 0; j < processed_projs.length; j++) {
-                        let proj = processed_projs[j];
-                        if (RegExp(reg_flag.join("|").split("|")[i]).test(proj)) {
-                            let tempTxt = projIndex + "、";
-                            tempTxt = proj.replace(/^\d、|^/, tempTxt);
-                            today_projs.push(tempTxt);
-                            tempTxt = input_projs_session[j];
-                            input_projs.push(tempTxt);
-                            projIndex++;
+            if (!document.querySelector(".CodeMirror-merge")) {
+
+                // 对日报内容进行排序
+                if (sessionStorage.getItem("processedProjs")) {
+                    let processed_projs = sessionStorage.getItem("processedProjs").split("\n");
+                    let input_projs_session = sessionStorage.getItem("inputProjs").split("\n");
+                    let today_projs = [], input_projs = [];
+                    let projIndex = 1;
+                    for (let i = 0; i < reg_flag.join("|").split("|").length; i++) {
+                        for (let j = 0; j < processed_projs.length; j++) {
+                            let proj = processed_projs[j];
+                            if (RegExp(reg_flag.join("|").split("|")[i]).test(proj)) {
+                                let tempTxt = projIndex + "、";
+                                tempTxt = proj.replace(/^\d、|^/, tempTxt);
+                                today_projs.push(tempTxt);
+                                tempTxt = input_projs_session[j];
+                                input_projs.push(tempTxt);
+                                projIndex++;
+                            }
                         }
                     }
-                }
-                
-                if (inputBox.style.color != "red") {
-                    inputBox.style.color = "red";
-                } else {
-                    inputBox.style.color = "green";
-                }
 
-                // 修改前后文本对比
-                let leftValue = input_projs.join("\n");
-                let rightValue = today_projs.join("\n");
-                let t = document.getElementById("code_view");
-                CodeMirror.MergeView(t, {
-                    value: leftValue,
-                    lineWrapping: true,
-                    origLeft: null,
-                    orig: rightValue,
-                    lineNumbers: true,
-                    mode: "text/plain",
-                    highlightDifferences: true,
-                    connect: null,
-                    collapseIdentical: false,
-                    allowEditingOriginals: true
-                })
+                    // 切换字体颜色
+                    // if (inputBox.style.color != "red") {
+                    //     inputBox.style.color = "red";
+                    // } else {
+                    //     inputBox.style.color = "green";
+                    // }
 
-                //设置显示内容
-                const leftBox = document.querySelector(".CodeMirror-merge-pane");
-                const rightBox = document.querySelector(".CodeMirror-merge-right");
-                inputBox.style.display = "none";
-                // leftBox.style.display = "none";
+                    navigator.clipboard.writeText(today_projs.join("\n"));
+
+
+                    // 修改前后文本对比
+                    let leftValue = input_projs.join("\n");
+                    let rightValue = today_projs.join("\n");
+                    let t = document.getElementById("code_view");
+                    CodeMirror.MergeView(t, {
+                        value: leftValue,
+                        lineWrapping: true,
+                        origLeft: null,
+                        orig: rightValue,
+                        lineNumbers: true,
+                        mode: "text/plain",
+                        highlightDifferences: true,
+                        connect: null,
+                        collapseIdentical: false,
+                        allowEditingOriginals: true
+                    })
+
+                    //设置显示内容
+                    const leftBox = document.querySelector(".CodeMirror-merge-pane");
+                    const rightBox = document.querySelector(".CodeMirror-merge-right");
+                    inputBox.style.display = "none";
+                    // leftBox.style.display = "none";
+                }
             }
 
         }
@@ -238,26 +288,6 @@
         // inputBox.onkeydown = function (e) {
         //     if (e.key == "Enter") {
         //         functionEnter();
-        //     }
-        // }
-        // document.onkeydown = function (e) {
-        //     if (e.ctrlKey && e.keyCode == 40) {
-        //         const right_text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
-        //         let copy_text = "";
-        //         if (right_text_containers.length == 1) {
-        //             copy_text = right_text_containers[0].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
-        //         } else {
-        //             for (let i = 0; i < right_text_containers.length; i++) {
-        //                 copy_text = copy_text + right_text_containers[i].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
-        //                 if (i < right_text_containers.length - 1)
-        //                     copy_text = copy_text + "\n";
-        //             }
-        //         }
-        //         //		alert(copy_text);
-        //         navigator.clipboard.writeText(copy_text);
-        //         setTimeout(function () {
-        //             window.close();
-        //         }, 200);
         //     }
         // }
 
