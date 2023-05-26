@@ -1,0 +1,267 @@
+﻿<!DOCTYPE html>
+<html lang="zh-cmn-Hans">
+<meta http-equiv="content-type" content="text/html;charset=UTF-8" />
+
+<head>
+    <meta charset="UTF-8">
+    <title>日报处理</title>
+    <link rel="stylesheet" href="./codeMirrorDLL/codemirror.min.css">
+    <link rel="stylesheet" href="./codeMirrorDLL/merge.css">
+    <script src="./codeMirrorDLL/jquery.min.js"></script>
+    <style>
+        .CodeMirror-merge,
+        .CodeMirror-merge .CodeMirror {
+            height: 98vh;
+        }
+
+        .CodeMirror-merge-2pane .CodeMirror-merge-pane {
+            width: 50%;
+        }
+
+        .CodeMirror-merge-gap {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- <input type="text" id="typein"> -->
+    <textarea id="typein" cols="100" rows="15"></textarea>
+    <div id="code_view"></div>
+    <button id="switch">切换</button>
+    <button id="export">日报</button>
+    <button id="enter">录入</button>
+
+    <script src="./codeMirrorDLL/diff_match_patch.js"></script>
+    <script src="./codeMirrorDLL/codemirror.min.js"></script>
+    <script src="./codeMirrorDLL/merge.js"></script>
+
+    <script>
+
+        const inputBox = document.querySelector("#typein");
+        const buttonSwitch = document.querySelector("#switch");
+        const buttonExport = document.querySelector("#export");
+        const buttonEnter = document.querySelector("#enter");
+        let reg_flag = ["登高二|登高站扩建|储气|龙马|南浦", "外环西段|温泉", "莲塘|军田|田岗|文塔|汇能"];
+
+        // 录入项目作业计划
+        function functionEnter() {
+
+            let inputValue = inputBox.value;
+            inputValue = inputValue.replace(/[\r\n]/g, "\n").replace(/\(/g, "（").replace(/\)/g, "）").replace(/,/g, "，").replace(/:/g, "：").replace(/;/g, "；");
+            let match_projs = inputValue.match(RegExp(reg_flag.join("|"), "g"));
+            // 去除重复
+            function unique(arr) {
+                let newArr = [];
+                for (let i = 0; i < arr.length; i++) {
+                    if (newArr.indexOf(arr[i]) === -1) {
+                        newArr.push(arr[i]);
+                    }
+                }
+                return newArr;
+            }
+            match_projs = unique(match_projs);
+            // alert(match_projs);
+            // 将输入拆分成各个项目
+            let seperated_projs_list;
+            if (match_projs.length > 1) {
+                seperated_projs_list = inputValue.match(/^.+?作业内容：.+?（.风险）.+$/gm);
+                // alert(seperated_projs_list.join("\n"));
+                if (seperated_projs_list.length > match_projs.length) {
+                    alert("分解提取各个项目时出错！（根据段落提取,每个段落为一个项目）");
+                }
+            } else {
+                seperated_projs_list = [inputValue.replace(/\n/g, "")];
+            }
+            let processed_projs = [];
+            for (let i = 0; i < seperated_projs_list.length; i++) {
+
+                let seperated_proj = seperated_projs_list[i];
+                // 标点及格式替换
+                seperated_proj = seperated_proj.replace(/\n/g, "");
+                seperated_proj = seperated_proj.replace(/（\d）(（\d）)/g, "$1").replace(/(?<=外环AB线)\s\s/g, "").replace(/\s\s/g, "：");
+                // 提取项目名称到{processed_text}
+                let processed_text = seperated_proj.match(/(?<=.+?，).+?(?=；?作业内容：)|\d、.+?(?=；?作业内容：)/);
+                if (!processed_text) {
+                    let alertText = "提取项目名称（第" + (i + 1) + "个项目）时出错！";
+                    alert(alertText);
+                    return 0
+                }
+                processed_text = processed_text.toString().replace(/（\d）|\s/g, "") + "；作业内容：";
+                let seperated_plans_list = seperated_proj.match(/(（\d{1,2}）)?.+?（.风险）.+?施工..管控人员：[\u4e00-\u9fa5]{2,4}。?/g);
+                if (!seperated_plans_list) {
+                    seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
+                } else if (seperated_plans_list.length < seperated_proj.match(/（.风险）/g).length) {
+                    seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
+                }
+                if (!seperated_plans_list) {
+                    let alertText = "提取作业计划（第" + (i + 1) + "个项目）时出错！";
+                    alert(alertText);
+                    return 0
+                }
+                // 筛选出项目中的中风险以上作业=>{seperated_plans_list}
+                function filterFun(plan) {
+                    if (/（中风险）|（高风险）/.test(plan)) {
+                        return plan;
+                    }
+                };
+                seperated_plans_list = seperated_plans_list.filter(filterFun);
+                if (seperated_plans_list == "") {
+                    inputBox.value = processed_text;
+                    return 0
+                }
+
+                // 将高风险作业放到列表{seperated_plans_list}最前面
+                function filterHigh(plan) {
+                    if (/（高风险）/.test(plan))
+                        return plan;
+                };
+                highrisk_plans_list = seperated_plans_list.filter(filterHigh);
+                seperated_plans_list = highrisk_plans_list.concat(seperated_plans_list);
+                seperated_plans_list = unique(seperated_plans_list);
+
+                // 对列表{seperated_plans_list}中的每项作业条目进行格式修正
+                for (let j = 0; j < seperated_plans_list.length; j++) {
+                    // 格式修正
+                    let seperated_plan = seperated_plans_list[j].replace(/(?<![A-Za-z]\d?)(?!\b)\d、/g, "；").replace(/（\d）/g, "").replace(/.+；?作业内容：/g, "").replace(/[。；](（.风险）)/g, "$1").replace(/(（.风险）)(\b|。)/g, "$1；").replace(/(?<=[\u4e00-\u9fa5])$|；$/, "。").replace(/\s/g, "");
+                    // 给每条作业计划添加序号
+                    let serial = "（" + (j + 1) + "）";
+                    seperated_plan = seperated_plan.replace(/^（\d{1,2}）|^/, serial);
+                    // 将格式修正完成的作业条目更新到列表{seperated_plans_list}
+                    seperated_plans_list.splice(j, 1, seperated_plan);
+                }
+                processed_text = processed_text + seperated_plans_list.join("");
+                processed_projs.push(processed_text);
+            };
+
+            inputBox.value = processed_projs.join("\n");
+            navigator.clipboard.writeText(processed_projs.join("\n"));
+
+            // 将结果存入sessionStorage
+            if (!sessionStorage.getItem("processedProjs")) {
+                sessionStorage.setItem("inputProjs", inputValue);
+                sessionStorage.setItem("processedProjs", processed_projs.join("\n"));
+            } else {
+                let match_projs = processed_projs.join("\n").match(RegExp(reg_flag.join("|"), "g"));
+                let processedProjs_session = sessionStorage.getItem("processedProjs").split("\n");
+                let input_session = sessionStorage.getItem("inputProjs").split("\n");
+                match_projs = processedProjs_session.join("\n").match(RegExp(match_projs.join("|"), "g"));
+                if (match_projs) {
+                    function filterdelrepeat(proj) {
+                        if (!RegExp(match_projs.join("|"), "g").test(proj)) {
+                            return proj;
+                        }
+                    };
+                    processedProjs_session = processedProjs_session.filter(filterdelrepeat);
+                    input_session = input_session.filter(filterdelrepeat);
+                }
+                let tempText = processedProjs_session.concat(processed_projs).join("\n");
+                sessionStorage.setItem("processedProjs", tempText);
+                input_session.push(inputValue);
+                tempText = input_session.join("\n");
+                sessionStorage.setItem("inputProjs", tempText);
+            }
+
+        }
+
+        //切换显示内容：修改前<--->修改后
+        buttonSwitch.onclick = function () {
+            const leftBox = document.querySelector(".CodeMirror-merge-pane");
+            const rightBox = document.querySelector(".CodeMirror-merge-right");
+
+            if (rightBox.style.display == "none") {
+                leftBox.style.display = "none";
+                rightBox.style.display = "inline-block";
+            } else {
+                leftBox.style.display = "inline-block";
+                rightBox.style.display = "none";
+            }
+        }
+
+        // 生成日报并用CodeMirror显示修改前后对比结果
+        buttonExport.onclick = function () {
+
+            // 对日报内容进行排序
+            if (sessionStorage.getItem("processedProjs")) {
+                let processed_projs = sessionStorage.getItem("processedProjs").split("\n");
+                let input_projs_session = sessionStorage.getItem("inputProjs").split("\n");
+                let today_projs = [], input_projs = [];
+                let projIndex = 1;
+                for (let i = 0; i < reg_flag.join("|").split("|").length; i++) {
+                    for (let j = 0; j < processed_projs.length; j++) {
+                        let proj = processed_projs[j];
+                        if (RegExp(reg_flag.join("|").split("|")[i]).test(proj)) {
+                            let tempTxt = projIndex + "、";
+                            tempTxt = proj.replace(/^\d、|^/, tempTxt);
+                            today_projs.push(tempTxt);
+                            tempTxt = input_projs_session[j];
+                            input_projs.push(tempTxt);
+                            projIndex++;
+                        }
+                    }
+                }
+                
+                if (inputBox.style.color != "red") {
+                    inputBox.style.color = "red";
+                } else {
+                    inputBox.style.color = "green";
+                }
+
+                // 修改前后文本对比
+                let leftValue = input_projs.join("\n");
+                let rightValue = today_projs.join("\n");
+                let t = document.getElementById("code_view");
+                CodeMirror.MergeView(t, {
+                    value: leftValue,
+                    lineWrapping: true,
+                    origLeft: null,
+                    orig: rightValue,
+                    lineNumbers: true,
+                    mode: "text/plain",
+                    highlightDifferences: true,
+                    connect: null,
+                    collapseIdentical: false,
+                    allowEditingOriginals: true
+                })
+
+                //设置显示内容
+                const leftBox = document.querySelector(".CodeMirror-merge-pane");
+                const rightBox = document.querySelector(".CodeMirror-merge-right");
+                inputBox.style.display = "none";
+                // leftBox.style.display = "none";
+            }
+
+        }
+
+        //按键或回车，录入文字
+        buttonEnter.onclick = functionEnter;
+        // inputBox.onkeydown = function (e) {
+        //     if (e.key == "Enter") {
+        //         functionEnter();
+        //     }
+        // }
+        // document.onkeydown = function (e) {
+        //     if (e.ctrlKey && e.keyCode == 40) {
+        //         const right_text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
+        //         let copy_text = "";
+        //         if (right_text_containers.length == 1) {
+        //             copy_text = right_text_containers[0].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+        //         } else {
+        //             for (let i = 0; i < right_text_containers.length; i++) {
+        //                 copy_text = copy_text + right_text_containers[i].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+        //                 if (i < right_text_containers.length - 1)
+        //                     copy_text = copy_text + "\n";
+        //             }
+        //         }
+        //         //		alert(copy_text);
+        //         navigator.clipboard.writeText(copy_text);
+        //         setTimeout(function () {
+        //             window.close();
+        //         }, 200);
+        //     }
+        // }
+
+    </script>
+</body>
+
+</html>
