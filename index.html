@@ -18,7 +18,8 @@
             width: 50%;
         }
 
-        .CodeMirror-merge-gap {
+        .CodeMirror-merge-gap,
+        .invisible {
             display: none;
         }
 
@@ -28,7 +29,7 @@
 
         button {
             font-size: xx-large;
-            margin-left: 1em;
+            /* margin-left: 1em; */
             margin-right: 1em;
         }
     </style>
@@ -40,13 +41,13 @@
     </div>
     <textarea id="typein" rows="30"></textarea>
     <!-- <input type="text" id="typein"> -->
-    <div id="code_view"></div>
     <div class="buttonContainer">
         <!-- <button id="switch">切换</button> -->
-        <button id="copy">拷贝</button>
+        <button id="copy">拷贝/切换</button>
         <button id="export">日报</button>
         <button id="enter">录入</button>
     </div>
+    <div id="code_view"></div>
 
     <script src="./codeMirrorDLL/diff_match_patch.js"></script>
     <script src="./codeMirrorDLL/codemirror.min.js"></script>
@@ -123,168 +124,201 @@
 
         // 录入项目作业计划
         function functionEnter() {
-
-            let inputValue = inputBox.value;
-            inputValue = inputValue.replace(/[\r\n]/g, "\n").replace(/\(/g, "（").replace(/\)/g, "）").replace(/,/g, "，").replace(/:/g, "：").replace(/;/g, "；");
-            let match_projs = inputValue.match(RegExp(reg_flag.join("|"), "g"));
-            match_projs = unique(match_projs);
-            // alert(match_projs);
-            // 将输入拆分成各个项目
-            let seperated_projs_list;
-            if (match_projs.length > 1) {
-                seperated_projs_list = inputValue.match(/^.+$/gm);
-                // alert(seperated_projs_list.join("\n"));
-                if (seperated_projs_list.length > match_projs.length) {
-                    alert("分解提取各个项目时出错！（根据段落提取,每个段落为一个项目）");
+            if (!document.querySelector(".CodeMirror-merge")) {
+                let inputValue = inputBox.value;
+                if (inputValue == "") {
+                    alert("未输入任何内容！");
+                    return;
                 }
-            } else {
-                seperated_projs_list = [inputValue.replace(/\n/g, "")];
-            }
-            let processed_projs = [];
-            for (let i = 0; i < seperated_projs_list.length; i++) {
-
-                let seperated_proj = seperated_projs_list[i];
-                // 标点及格式替换
-                seperated_proj = seperated_proj.replace(/\n/g, "");
-                seperated_proj = seperated_proj.replace(/（\d）(（\d）)/g, "$1").replace(/(?<=外环AB线)\s\s/g, "").replace(/\s\s/g, "：");
-                // 提取项目名称到{processed_text}
-                let processed_text = seperated_proj.match(/(?<=.+?，).+?(?=；?作业内容：)|\d、.+?(?=；?作业内容：)/);
-                if (!processed_text) {
-                    let alertText = "提取项目名称（第" + (i + 1) + "个项目）时出错！";
-                    alert(alertText);
-                    return 0
-                }
-                processed_text = processed_text.toString().replace(/（\d）|\s/g, "") + "；作业内容：";
-                let seperated_plans_list = seperated_proj.match(/(（\d{1,2}）)?.+?（.风险）.+?施工..管控人员：[\u4e00-\u9fa5]{2,4}。?/g);
-                if (!seperated_plans_list) {
-                    seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
-                } else if (seperated_plans_list.length < seperated_proj.match(/（.风险）/g).length) {
-                    seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
-                }
-                if (!seperated_plans_list) {
-                    let alertText = "提取作业计划（第" + (i + 1) + "个项目）时出错！";
-                    alert(alertText);
-                    return 0
-                }
-                
-                // 筛选出项目中的中风险以上作业=>{seperated_plans_list}
-                function filterRisky(plan) {
-                    if (/（中风险）|（高风险）/.test(plan)) {
-                        return true;
+                inputValue = inputValue.replace(/[\r\n]/g, "\n").replace(/\(/g, "（").replace(/\)/g, "）").replace(/,/g, "，").replace(/:/g, "：").replace(/;/g, "；");
+                let match_projs = inputValue.match(RegExp(reg_flag.join("|"), "g"));
+                match_projs = unique(match_projs);
+                // alert(match_projs);
+                // 将输入拆分成各个项目
+                let seperated_projs_list;
+                if (match_projs.length > 1) {
+                    seperated_projs_list = inputValue.match(/^.+（.风险）.+$/gm);
+                    // alert(seperated_projs_list.join("\n"));
+                    if (seperated_projs_list.length > match_projs.length) {
+                        alert("分解提取各个项目时出错！请检查是否有重复的项目名称，并将内容合并到同一段落。");
                     }
+                } else {
+                    seperated_projs_list = [inputValue.replace(/\n/g, "")];
                 }
-                seperated_plans_list = seperated_plans_list.filter(filterRisky);
-                if (seperated_plans_list == "" || seperated_plans_list == null) {
-                    inputBox.value = processed_text;
-                    return 0
-                }
-                // 将高风险作业放到列表{seperated_plans_list}最前面
-                function filterHigh(plan) {
-                    if (/（高风险）/.test(plan)) {
-                        return true;
+                let processed_projs = [];
+                for (let i = 0; i < seperated_projs_list.length; i++) {
+
+                    let seperated_proj = seperated_projs_list[i];
+                    // 标点及格式替换
+                    seperated_proj = seperated_proj.replace(/\n/g, "");
+                    seperated_proj = seperated_proj.replace(/（\d）(（\d）)/g, "$1").replace(/(?<=外环AB线)\s\s/g, "").replace(/\s\s/g, "：");
+                    // 提取项目名称到{processed_text}
+                    let processed_text = seperated_proj.match(/(?<=.+?，).+?(?=；?作业内容：)|\d、.+?(?=；?作业内容：)|\d、.+?(?=；)/);
+                    if (!processed_text) {
+                        let alertText = "提取项目名称（第" + (i + 1) + "个项目）时出错！";
+                        alert(alertText);
+                        return;
                     }
-                }
-                highrisk_plans_list = seperated_plans_list.filter(filterHigh);
-                seperated_plans_list = highrisk_plans_list.concat(seperated_plans_list);
-                seperated_plans_list = unique(seperated_plans_list);
+                    processed_text = processed_text.toString().replace(/（\d）|\s/g, "") + "；作业内容：";
+                    let seperated_plans_list = seperated_proj.match(/(（\d{1,2}）)?.+?（.风险）.+?施工..管控人员：[\u4e00-\u9fa5]{2,4}。?/g);
+                    if (!seperated_plans_list) {
+                        seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
+                    } else if (seperated_plans_list.length < seperated_proj.match(/（.风险）/g).length) {
+                        seperated_plans_list = seperated_proj.match(/（\d{1,2}）.+?(?=（\d{1,2}）)|（\d{1,2}）.+$/gm);
+                    }
+                    if (!seperated_plans_list) {
+                        let alertText = "提取作业计划（第" + (i + 1) + "个项目）时出错！";
+                        alert(alertText);
+                        return;
+                    }
 
-                // 对列表{seperated_plans_list}中的每项作业条目进行格式修正
-                for (let j = 0; j < seperated_plans_list.length; j++) {
-                    // 格式修正
-                    let seperated_plan = seperated_plans_list[j].replace(/(?<![A-Za-z]\d?)(?!\b)\d、/g, "；").replace(/（\d）/g, "").replace(/.+；?作业内容：/g, "").replace(/[。；](（.风险）)/g, "$1").replace(/(（.风险）)(\b|。)/g, "$1；").replace(/(?<=[\u4e00-\u9fa5])$|；$/, "。").replace(/\s/g, "");
-                    // 给每条作业计划添加序号
-                    let serial = "（" + (j + 1) + "）";
-                    seperated_plan = seperated_plan.replace(/^（\d{1,2}）|^/, serial);
-                    // 将格式修正完成的作业条目更新到列表{seperated_plans_list}
-                    seperated_plans_list.splice(j, 1, seperated_plan);
-                }
-                processed_text = processed_text + seperated_plans_list.join("");
-                processed_projs.push(processed_text);
-            };
-
-            // 修改前后文本对比
-            let leftValue = inputValue;
-            let rightValue = processed_projs.join("\n");
-            let t = document.getElementById("code_view");
-            CodeMirror.MergeView(t, {
-                value: leftValue,
-                lineWrapping: true,
-                origLeft: null,
-                orig: rightValue,
-                lineNumbers: true,
-                mode: "text/plain",
-                highlightDifferences: true,
-                connect: null,
-                collapseIdentical: false,
-                allowEditingOriginals: true
-            })
-            // inputBox.value = processed_projs.join("\n");
-            inputBox.style.display = "none";
-            navigator.clipboard.writeText(processed_projs.join("\n"));
-
-            // 将结果存入sessionStorage
-            if (!sessionStorage.getItem("processedProjs")) {
-                sessionStorage.setItem("inputProjs", inputValue);
-                sessionStorage.setItem("processedProjs", processed_projs.join("\n"));
-            } else {
-                let match_projs = processed_projs.join("\n").match(RegExp(reg_flag.join("|"), "g"));
-                let processedProjs_session = sessionStorage.getItem("processedProjs").split("\n");
-                let input_session = sessionStorage.getItem("inputProjs").split("\n");
-                match_projs = processedProjs_session.join("\n").match(RegExp(match_projs.join("|"), "g"));
-                if (match_projs) {
-                    function filterdelrepeat(proj) {
-                        if (!RegExp(match_projs.join("|"), "g").test(proj)) {
+                    // 筛选出项目中的中风险以上作业=>{seperated_plans_list}
+                    function filterRisky(plan) {
+                        if (/（中风险）|（高风险）/.test(plan)) {
                             return true;
                         }
                     }
-                    processedProjs_session = processedProjs_session.filter(filterdelrepeat);
-                    input_session = input_session.filter(filterdelrepeat);
+                    seperated_plans_list = seperated_plans_list.filter(filterRisky);
+                    if (seperated_plans_list == "" || seperated_plans_list == null) {
+                        inputBox.value = processed_text;
+                        return;
+                    }
+                    // 将高风险作业放到列表{seperated_plans_list}最前面
+                    function filterHigh(plan) {
+                        if (/（高风险）/.test(plan)) {
+                            return true;
+                        }
+                    }
+                    highrisk_plans_list = seperated_plans_list.filter(filterHigh);
+                    seperated_plans_list = highrisk_plans_list.concat(seperated_plans_list);
+                    seperated_plans_list = unique(seperated_plans_list);
+
+                    // 对列表{seperated_plans_list}中的每项作业条目进行格式修正
+                    for (let j = 0; j < seperated_plans_list.length; j++) {
+                        // 格式修正
+                        let seperated_plan = seperated_plans_list[j].replace(/(?<![A-Za-z]\d?)(?!\b)\d、/g, "；").replace(/（\d）/g, "").replace(/.+；?作业内容：|^\d、.+?：/, "").replace(/[。；](（.风险）)/g, "$1").replace(/(（.风险）)(\b|。)/g, "$1；").replace(/(?<=[\u4e00-\u9fa5])$|；$/, "。").replace(/\s/g, "");
+                        // 给每条作业计划添加序号
+                        let serial = "（" + (j + 1) + "）";
+                        seperated_plan = seperated_plan.replace(/^（\d{1,2}）|^/, serial);
+                        // 将格式修正完成的作业条目更新到列表{seperated_plans_list}
+                        seperated_plans_list.splice(j, 1, seperated_plan);
+                    }
+                    processed_text = processed_text + seperated_plans_list.join("");
+                    processed_projs.push(processed_text);
+                };
+
+                // 修改前后文本对比
+                let leftValue = inputValue;
+                let rightValue = processed_projs.join("\n");
+                let t = document.getElementById("code_view");
+                CodeMirror.MergeView(t, {
+                    value: leftValue,
+                    lineWrapping: true,
+                    origLeft: null,
+                    orig: rightValue,
+                    lineNumbers: true,
+                    mode: "text/plain",
+                    highlightDifferences: true,
+                    connect: null,
+                    collapseIdentical: false,
+                    allowEditingOriginals: true
+                })
+                // inputBox.value = processed_projs.join("\n");
+                inputBox.style.display = "none";
+            } else if (!document.querySelector(".CodeMirror-merge-pane").classList.contains("invisible") && !document.querySelector(".CodeMirror-merge-right").classList.contains("invisible")) {
+                // 将结果存入sessionStorage
+                let inputValue = copyText(0);
+                let processed_projs = copyText(1).split("\n");
+                // 去除inputValue中的标题段
+                function deltitleP(proj) {
+                    if (!RegExp("【项目管理中心】|当日重点", "g").test(proj)) {
+                        return true;
+                    }
                 }
-                let tempText = processedProjs_session.concat(processed_projs).join("\n");
-                sessionStorage.setItem("processedProjs", tempText);
-                input_session.push(inputValue);
-                tempText = input_session.join("\n");
-                sessionStorage.setItem("inputProjs", tempText);
+                inputValue = inputValue.split("\n").filter(deltitleP).join("\n");
+                if (inputValue.split("\n").length != processed_projs.length) {
+                    alert("左右项目数量不一致！");
+                    return;
+                }
+
+                if (!sessionStorage.getItem("processedProjs")) {
+                    sessionStorage.setItem("inputProjs", inputValue);
+                    sessionStorage.setItem("processedProjs", processed_projs.join("\n"));
+                } else {
+                    // 查找重复项
+                    let match_projs = processed_projs.join("\n").match(RegExp(reg_flag.join("|"), "g"));
+                    let processedProjs_session = sessionStorage.getItem("processedProjs").split("\n");
+                    match_projs = processedProjs_session.join("\n").match(RegExp(match_projs.join("|"), "g"));
+
+                    let input_session = sessionStorage.getItem("inputProjs").split("\n");
+                    // 如果session_storage中存在重复项，将其删除
+                    if (match_projs) {
+                        function filterdelrepeat(proj) {
+                            if (!RegExp(match_projs.join("|").concat("|【项目管理中心】|当日重点"), "g").test(proj)) {
+                                return true;
+                            }
+                        }
+                        processedProjs_session = processedProjs_session.filter(filterdelrepeat);
+                        input_session = input_session.filter(filterdelrepeat);
+                    }
+                    let tempTxt = processedProjs_session.concat(processed_projs).join("\n");
+                    sessionStorage.setItem("processedProjs", tempTxt);
+                    input_session.push(inputValue);
+                    tempTxt = input_session.join("\n");
+                    sessionStorage.setItem("inputProjs", tempTxt);
+                }
+                navigator.clipboard.writeText(processed_projs.join("\n"));
             }
 
             // 统计已录入的各个项目的计划数，并在span#hint中显示
             refreshHint();
         }
 
-        // 切换显示内容：修改前<--->修改后
-        // buttonSwitch.onclick = function () {
-        //     const leftBox = document.querySelector(".CodeMirror-merge-pane");
-        //     const rightBox = document.querySelector(".CodeMirror-merge-right");
+        // buttonSwitch.onclick = function () {}
 
-        //     if (rightBox.style.display == "none") {
-        //         leftBox.style.display = "none";
-        //         rightBox.style.display = "inline-block";
-        //     } else {
-        //         leftBox.style.display = "inline-block";
-        //         rightBox.style.display = "none";
-        //     }
-        // }
-
-        // 复制codeMirror中右边部分的内容
-        function copyRightTxt() {
-            if (document.querySelector(".CodeMirror-merge")) {
-                const right_text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
-                let copy_text = "";
-                if (right_text_containers.length == 1) {
-                    copy_text = right_text_containers[0].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
-                } else {
-                    for (let i = 0; i < right_text_containers.length; i++) {
-                        copy_text = copy_text + right_text_containers[i].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
-                        if (i < right_text_containers.length - 1)
-                            copy_text = copy_text + "\n";
-                    }
+        function copyText(container) {
+            let text_containers;
+            if (container == 0) {
+                text_containers = document.querySelectorAll(".CodeMirror-merge-editor .CodeMirror-code>div");
+            }
+            if (container == 1) {
+                text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
+            }
+            let copy_text = "";
+            if (text_containers.length == 1) {
+                copy_text = text_containers[0].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+            } else {
+                for (let i = 0; i < text_containers.length; i++) {
+                    copy_text = copy_text + text_containers[i].querySelector("span[role]").innerHTML.replace(/<span.+?>|<\/span>/g, "");
+                    if (i < text_containers.length - 1)
+                        copy_text = copy_text + "\n";
                 }
+            }
+            return copy_text;
+        }
+
+        // 按下“拷贝”，复制codeMirror中右边部分的内容，并切换显示内容：修改前<--->修改后
+        buttonCopy.onclick = function () {
+
+            if (document.querySelector(".CodeMirror-merge")) {
+                let copy_text = copyText(1);
                 // alert(copy_text);
                 navigator.clipboard.writeText(copy_text);
+                // 切换显示内容
+                const leftBox = document.querySelector(".CodeMirror-merge-pane");
+                const rightBox = document.querySelector(".CodeMirror-merge-right");
+                if (leftBox.classList.contains("invisible") || rightBox.classList.contains("invisible")) {
+                    leftBox.classList.toggle("invisible");
+                    rightBox.classList.toggle("invisible");
+                }
+                // test
+                navigator.clipboard.readText().then((cliptext) => {
+                    if (cliptext === copy_text) {
+                        alert("test");
+                    }
+                })
             }
         }
-        // 按下“拷贝”，复制内容
-        buttonCopy.onclick = copyRightTxt;
 
         // 按下“日报”，生成日报，并用CodeMirror对比结果
         buttonExport.onclick = function () {
@@ -293,7 +327,7 @@
                 location.reload();
             } else {
                 if (sessionStorage.getItem("processedProjs")) {
-                    
+
                     let processed_projs = sessionStorage.getItem("processedProjs").split("\n");
                     let input_projs_session = sessionStorage.getItem("inputProjs").split("\n");
                     let today_projs = [], input_projs = [];
@@ -313,40 +347,9 @@
                         }
                     }
 
-                    // 切换字体颜色
-                    // if (inputBox.style.color != "red") {
-                    //     inputBox.style.color = "red";
-                    // } else {
-                    //     inputBox.style.color = "green";
-                    // }
-
-                    // 修改前后文本对比
-                    let leftValue = input_projs.join("\n");
-                    let rightValue = today_projs.join("\n");
-                    let t = document.getElementById("code_view");
-                    CodeMirror.MergeView(t, {
-                        value: leftValue,
-                        lineWrapping: true,
-                        origLeft: null,
-                        orig: rightValue,
-                        lineNumbers: true,
-                        mode: "text/plain",
-                        highlightDifferences: true,
-                        connect: null,
-                        collapseIdentical: false,
-                        allowEditingOriginals: true
-                    })
-
-                    // 设置显示内容
-                    // 隐藏输入框
-                    inputBox.style.display = "none";
-                    // const leftBox = document.querySelector(".CodeMirror-merge-pane");
-                    // const rightBox = document.querySelector(".CodeMirror-merge-right");
-                    // leftBox.style.display = "none";
-
                     // 输出完整日报到剪贴板
                     let planCount = refreshHint().toString().split(","), planCountInt = [];
-                    planCount.forEach((eachNum)=> {planCountInt.push(parseInt(eachNum))});
+                    planCount.forEach((eachNum) => { planCountInt.push(parseInt(eachNum)) });
                     let allRiskyPlans = 0;
                     for (let i = 0; i < planCountInt.length; i++) {
                         allRiskyPlans = allRiskyPlans + planCountInt[i];
@@ -369,11 +372,44 @@
                     }
                     let mainNetNum = parseInt(inputNum[0]) + allRiskyPlans - parseInt(inputNum[2]);
                     let output = "【项目管理中心】" + month + "月" + day + "日基建施工信息：在建项目数：主网"
-                    + mainNetNum + "项，共计" + mainNetNum + "项，施工人数" + parseInt(inputNum[1]) + "人，其中中风险以上作业"
-                    +  allRiskyPlans + "项（中风险" + (planCountInt[0] + planCountInt[2] + planCountInt[4]) + "项，高风险"
-                    + (planCountInt[1] + planCountInt[3] + planCountInt[5]) + "项）。\n当日重点管控项目名称：\n"
-                    + today_projs.join("\n");
+                        + mainNetNum + "项，共计" + mainNetNum + "项，施工人数" + parseInt(inputNum[1]) + "人，其中中风险以上作业"
+                        + allRiskyPlans + "项（中风险" + (planCountInt[0] + planCountInt[2] + planCountInt[4]) + "项，高风险"
+                        + (planCountInt[1] + planCountInt[3] + planCountInt[5]) + "项）。\n当日重点管控项目名称：\n"
+                        + today_projs.join("\n");
                     navigator.clipboard.writeText(output);
+
+                    // 切换字体颜色
+                    // if (inputBox.style.color != "red") {
+                    //     inputBox.style.color = "red";
+                    // } else {
+                    //     inputBox.style.color = "green";
+                    // }
+
+                    // 修改前后文本对比
+                    let leftValue = input_projs.join("\n");
+                    let rightValue = output;
+                    let t = document.getElementById("code_view");
+                    CodeMirror.MergeView(t, {
+                        value: leftValue,
+                        lineWrapping: true,
+                        origLeft: null,
+                        orig: rightValue,
+                        lineNumbers: true,
+                        mode: "text/plain",
+                        highlightDifferences: true,
+                        connect: null,
+                        collapseIdentical: false,
+                        allowEditingOriginals: true
+                    })
+
+                    // 隐藏输入框
+                    inputBox.style.display = "none";
+                    // 设置显示内容
+                    const leftBox = document.querySelector(".CodeMirror-merge-pane");
+                    const rightBox = document.querySelector(".CodeMirror-merge-right");
+                    leftBox.classList.add("invisible");
+                    leftBox.style.width = "100%";
+                    rightBox.style.width = "100%";
                 }
             }
 
