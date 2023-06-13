@@ -26,12 +26,17 @@
 
         #typein {
             width: 100%;
+            font-size: 18px;
         }
 
         button {
             font-size: 32px;
             /* margin-left: 1em; */
             margin-right: 1em;
+        }
+
+        .bgRed {
+            background-color: red;
         }
     </style>
 </head>
@@ -40,7 +45,7 @@
     <div class="hintContainer">
         <span id="hint" width="100%">未录入计划</span>
     </div>
-    <textarea id="typein" rows="30"></textarea>
+    <textarea id="typein" rows="20"></textarea>
     <!-- <input type="text" id="typein"> -->
     <div class="buttonContainer">
         <!-- <button id="switch">切换</button> -->
@@ -132,6 +137,13 @@
                     return;
                 }
                 inputValue = inputValue.replace(/[\r\n]/g, "\n").replace(/\(/g, "（").replace(/\)/g, "）").replace(/,/g, "，").replace(/:/g, "：").replace(/;/g, "；");
+                // 去除inputValue中的标题段
+                function deltitleP(proj) {
+                    if (!RegExp("【项目管理中心】|当日重点", "g").test(proj)) {
+                        return true;
+                    }
+                }
+                inputValue = inputValue.split("\n").filter(deltitleP).join("\n");
                 let match_projs = inputValue.match(RegExp(reg_flag.join("|"), "g"));
                 match_projs = unique(match_projs);
                 // alert(match_projs);
@@ -226,17 +238,13 @@
                 })
                 // inputBox.value = processed_projs.join("\n");
                 inputBox.style.display = "none";
+                if (!buttonEnter.classList.contains("bgRed") && document.querySelector(".CodeMirror-merge")) {
+                    buttonEnter.classList.add("bgRed");
+                }
             } else if (!document.querySelector(".CodeMirror-merge-pane").classList.contains("invisible") && !document.querySelector(".CodeMirror-merge-right").classList.contains("invisible")) {
                 // 将结果存入sessionStorage
                 let inputValue = copyText(0);
                 let processed_projs = copyText(1).split("\n");
-                // 去除inputValue中的标题段
-                function deltitleP(proj) {
-                    if (!RegExp("【项目管理中心】|当日重点", "g").test(proj)) {
-                        return true;
-                    }
-                }
-                inputValue = inputValue.split("\n").filter(deltitleP).join("\n");
                 if (inputValue.split("\n").length != processed_projs.length) {
                     alert("左右项目数量不一致！");
                     return;
@@ -245,6 +253,9 @@
                 if (!sessionStorage.getItem("processedProjs")) {
                     sessionStorage.setItem("inputProjs", inputValue);
                     sessionStorage.setItem("processedProjs", processed_projs.join("\n"));
+                    if (buttonEnter.classList.contains("bgRed")) {
+                        buttonEnter.classList.remove("bgRed");
+                    }
                 } else {
                     // 查找重复项
                     let match_projs = processed_projs.join("\n").match(RegExp(reg_flag.join("|"), "g"));
@@ -267,8 +278,11 @@
                     input_session.push(inputValue);
                     tempTxt = input_session.join("\n");
                     sessionStorage.setItem("inputProjs", tempTxt);
+                    if (buttonEnter.classList.contains("bgRed")) {
+                        buttonEnter.classList.remove("bgRed");
+                    }
                 }
-                navigator.clipboard.writeText(processed_projs.join("\n"));
+                navigator.clipboard.writeText(copyText(1));
             }
 
             // 统计已录入的各个项目的计划数，并在span#hint中显示
