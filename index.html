@@ -16,6 +16,7 @@
 
         .CodeMirror-merge-2pane .CodeMirror-merge-pane {
             width: 50%;
+            font-size: 24px;
         }
 
         .CodeMirror-merge-gap,
@@ -28,7 +29,7 @@
         }
 
         button {
-            font-size: xx-large;
+            font-size: 32px;
             /* margin-left: 1em; */
             margin-right: 1em;
         }
@@ -280,8 +281,7 @@
             let text_containers;
             if (container == 0) {
                 text_containers = document.querySelectorAll(".CodeMirror-merge-editor .CodeMirror-code>div");
-            }
-            if (container == 1) {
+            }else if (container == 1) {
                 text_containers = document.querySelectorAll(".CodeMirror-merge-right .CodeMirror-code>div");
             }
             let copy_text = "";
@@ -312,11 +312,11 @@
                     rightBox.classList.toggle("invisible");
                 }
                 // test
-                navigator.clipboard.readText().then((cliptext) => {
-                    if (cliptext === copy_text) {
-                        alert("test");
-                    }
-                })
+                // navigator.clipboard.readText().then((cliptext) => {
+                //     if (cliptext === copy_text) {
+                //         alert("test");
+                //     }
+                // })
             }
         }
 
