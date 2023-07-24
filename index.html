@@ -67,7 +67,7 @@
         const buttonCopy = document.querySelector("#copy");
         const buttonExport = document.querySelector("#export");
         const buttonEnter = document.querySelector("#enter");
-        let reg_flag = ["珠西南|登高二|储气|龙马|南浦", "外环西段|温泉", "莲塘|军田|田岗|文塔|汇能"];
+        let reg_flag = ["珠西南|登高二|储气|古劳山|龙马|南浦", "外环西段|温泉", "莲塘|军田|田岗|文塔|汇能"];
 
 
         // 去除重复
@@ -209,7 +209,7 @@
                     // 对列表{seperated_plans_list}中的每项作业条目进行格式修正
                     for (let j = 0; j < seperated_plans_list.length; j++) {
                         // 格式修正
-                        let seperated_plan = seperated_plans_list[j].replace(/(?<![A-Za-z]\d?)(?!\b)\d、/g, "；").replace(/（\d）/g, "").replace(/.+；?作业内容：|^\d、.+?：/, "").replace(/[。；](（.风险）)/g, "$1").replace(/(（.风险）)(\b|。)/g, "$1；").replace(/(?<=[\u4e00-\u9fa5])$|；$/, "。").replace(/\s/g, "");
+                        let seperated_plan = seperated_plans_list[j].replace(/(?<![A-Za-z]\d?)(?!\b)\d、/g, "；").replace(/（\d）/g, "").replace(/.+；?作业内容：|^\d、.+?：/, "").replace(/[。；](（.风险）)/g, "$1").replace(/（(.风险)；）/g, "（$1）").replace(/(（.风险）)(\b|。|；)/g, "$1；").replace(/(?<=[\u4e00-\u9fa5])$|；$/, "。").replace(/\s/g, "");
                         // 给每条作业计划添加序号
                         let serial = "（" + (j + 1) + "）";
                         seperated_plan = seperated_plan.replace(/^（\d{1,2}）|^/, serial);
